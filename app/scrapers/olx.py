@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-import asyncio
 import logging
 
-from playwright.async_api import Browser, Page
+from playwright.async_api import Browser
 
-from app.constants import SEARCH_TARGETS
+from app.constants import CONSOLE_SEARCH_URLS
 from app.models import Offer
 from app.scrapers.base import BaseScraper, OfferCallback
-from app.utils.console_parser import parse_color, parse_condition, parse_model, parse_storage
+from app.utils.console_parser import parse_console_model, parse_console_storage, parse_console_color, parse_console_condition
 from app.utils.misc import absolute_url, clean_text, normalize_price
 
 logger = logging.getLogger(__name__)
@@ -17,154 +16,177 @@ logger = logging.getLogger(__name__)
 class OLXScraper(BaseScraper):
     source_name = "olx"
 
+    def __init__(self, settings) -> None:
+        super().__init__(settings)
+        self.start_urls = CONSOLE_SEARCH_URLS["olx"]
+
     async def scrape(
         self,
         browser: Browser,
         on_offer: OfferCallback | None = None,
     ) -> list[Offer]:
         offers: list[Offer] = []
-        semaphore = asyncio.Semaphore(self.settings.CONCURRENT_DETAIL_PAGES)
+        seen_urls: set[str] = set()
 
-        for model_hint, start_url in SEARCH_TARGETS[self.source_name].items():
+        for model_hint, start_url in self.start_urls.items():
             page = await self._new_page(browser)
+
             try:
                 await self.goto(page, start_url)
-                await page.wait_for_timeout(2200)
+                await page.wait_for_timeout(1800)
 
                 cards = page.locator("div[data-cy='l-card'], div[data-testid='l-card']")
                 count = min(await cards.count(), self.settings.MAX_OFFERS_PER_SOURCE)
-                logger.info("[%s] %s | liczba kart: %s", self.source_name, model_hint, count)
+                logger.info("[olx] model_hint=%s | kart=%s", model_hint, count)
 
                 urls: list[str] = []
-                seed_data: dict[str, dict] = {}
-
                 for i in range(count):
                     try:
                         card = cards.nth(i)
                         link = card.locator("a[href]").first
                         href = await link.get_attribute("href")
                         url = absolute_url("https://www.olx.pl", href)
-                        if not url:
-                            continue
-
-                        title = clean_text(await card.locator("h4, h6").first.inner_text()) if await card.locator("h4, h6").first.count() else ""
-                        price_text = clean_text(await card.locator("p[data-testid='ad-price'], p").first.inner_text()) if await card.locator("p[data-testid='ad-price'], p").first.count() else ""
-                        location_text = ""
-                        location_locator = card.locator("p[data-testid='location-date'], p")
-                        if await location_locator.count():
-                            all_text = clean_text(await location_locator.last.inner_text())
-                            location_text = all_text.split("-")[0].strip()
-
-                        img = ""
-                        img_el = card.locator("img").first
-                        if await img_el.count():
-                            src = (await img_el.get_attribute("src") or "").strip()
-                            if src.startswith(("http://", "https://")):
-                                img = src
-
-                        urls.append(url)
-                        seed_data[url] = {"title": title, "price_text": price_text, "location": location_text, "image_url": img, "model_hint": model_hint}
+                        if url and url not in seen_urls and url not in urls:
+                            urls.append(url)
                     except Exception:
-                        logger.exception("[%s] Nie udało się sparsować karty #%s", self.source_name, i)
+                        logger.exception("[olx] Nie udało się pobrać URL dla karty #%s", i)
 
-                async def process_detail(url: str) -> None:
-                    async with semaphore:
-                        detail_page = await self._new_page(browser)
-                        try:
-                            await self.goto(detail_page, url)
-                            await detail_page.wait_for_timeout(1400)
+                for url in urls:
+                    seen_urls.add(url)
+                    detail_page = await self._new_page(browser)
 
-                            seed = seed_data.get(url, {})
-                            title = await self._extract_title(detail_page) or seed.get("title", "")
-                            description = await self._extract_description(detail_page)
-                            detail_text = f"{title} {description}".strip()
+                    try:
+                        await self.goto(detail_page, url)
+                        await detail_page.wait_for_timeout(1200)
 
-                            offer = Offer(
-                                source=self.source_name,
-                                title=title,
-                                url=url,
-                                price=await self._extract_price(detail_page, seed.get("price_text", "")),
-                                location=await self._extract_location(detail_page) or seed.get("location", ""),
-                                image_url=await self._extract_image(detail_page) or seed.get("image_url", ""),
-                                description=description,
-                                condition=parse_condition(detail_text),
-                                model=parse_model(detail_text),
-                                storage=parse_storage(detail_text),
-                                color=parse_color(detail_text),
-                                raw_payload={"query_model": seed.get("model_hint", "")},
-                            )
+                        title = await self._extract_title(detail_page)
+                        price = await self._extract_price(detail_page)
+                        location = await self._extract_location(detail_page)
+                        image_url = await self._extract_image(detail_page)
+                        description = await self._extract_description(detail_page)
 
-                            await self.emit_offer(offer, offers, on_offer=on_offer)
-                        except Exception:
-                            logger.exception("[%s] Błąd detail page: %s", self.source_name, url)
-                        finally:
-                            await self.close_page(detail_page)
+                        blob = f"{title} {description}".strip()
+                        model = parse_console_model(blob)
+                        storage = parse_console_storage(blob)
+                        color = parse_console_color(blob)
+                        condition = parse_console_condition(blob)
 
-                await asyncio.gather(*(process_detail(url) for url in urls))
+                        offer = Offer(
+                            source=self.source_name,
+                            title=title,
+                            url=url,
+                            price=price,
+                            location=location,
+                            image_url=image_url,
+                            description=description,
+                            condition=condition,
+                            model=model,
+                            storage=storage,
+                            color=color,
+                            raw_payload={"model_hint": model_hint},
+                        )
+
+                        await self.emit_offer(offer, offers, on_offer=on_offer)
+
+                    except Exception:
+                        logger.exception("[olx] Błąd detail page: %s", url)
+                    finally:
+                        await self.close_page(detail_page)
+
             finally:
                 await self.close_page(page)
 
         return offers
 
-    async def _extract_title(self, page: Page) -> str:
-        for selector in ["h1", "[data-cy='ad_title']", "[data-testid='ad-title']"]:
+    async def _extract_title(self, page) -> str:
+        selectors = ["h4", "h1", "[data-cy='ad_title']", "meta[property='og:title']"]
+        for selector in selectors:
             try:
                 loc = page.locator(selector).first
-                if await loc.count():
-                    value = clean_text(await loc.inner_text())
-                    if value:
-                        return value
+                if not await loc.count():
+                    continue
+                if selector.startswith("meta"):
+                    return clean_text(await loc.get_attribute("content"))
+                return clean_text(await loc.inner_text())
             except Exception:
                 continue
         return ""
 
-    async def _extract_price(self, page: Page, fallback: str = "") -> float:
-        selectors = ["h3", "[data-testid='ad-price-container']", "[data-testid='ad-price']"]
+    async def _extract_price(self, page) -> float:
+        selectors = [
+            "[data-testid='ad-price-container']",
+            "h3",
+            "meta[property='product:price:amount']",
+        ]
         for selector in selectors:
             try:
                 loc = page.locator(selector).first
-                if await loc.count():
-                    value = clean_text(await loc.inner_text())
-                    price = normalize_price(value)
-                    if 50 <= price <= 30000:
-                        return price
+                if not await loc.count():
+                    continue
+                if selector.startswith("meta"):
+                    raw = await loc.get_attribute("content")
+                else:
+                    raw = await loc.inner_text()
+                price = normalize_price(raw)
+                if 50 <= price <= 20000:
+                    return price
             except Exception:
                 continue
-        return normalize_price(fallback)
+        return 0.0
 
-    async def _extract_description(self, page: Page) -> str:
-        selectors = ["div[data-cy='ad_description']", "[data-testid='ad-description']", "div[class*='description']"]
+    async def _extract_location(self, page) -> str:
+        selectors = [
+            "[data-testid='location-date']",
+            "[data-testid='ad-map-container']",
+            "p",
+        ]
         for selector in selectors:
             try:
                 loc = page.locator(selector).first
-                if await loc.count():
-                    value = clean_text(await loc.inner_text())
-                    if value and len(value) >= 8:
-                        return value[:700]
+                if not await loc.count():
+                    continue
+                value = clean_text(await loc.inner_text())
+                if value and len(value) <= 120:
+                    return value.split("-")[0].strip()
             except Exception:
                 continue
         return ""
 
-    async def _extract_location(self, page: Page) -> str:
-        selectors = ["[data-testid='location-date']", "[data-cy='ad_location']"]
+    async def _extract_image(self, page) -> str:
+        selectors = ["meta[property='og:image']", "img"]
         for selector in selectors:
             try:
-                loc = page.locator(selector).first
-                if await loc.count():
-                    value = clean_text(await loc.inner_text())
-                    if value:
-                        return value.split("-")[0].strip()
+                if selector.startswith("meta"):
+                    loc = page.locator(selector).first
+                    if await loc.count():
+                        src = (await loc.get_attribute("content") or "").strip()
+                        if src.startswith("http://") or src.startswith("https://"):
+                            return src
+                else:
+                    imgs = page.locator("img")
+                    count = await imgs.count()
+                    for i in range(min(count, 8)):
+                        src = (await imgs.nth(i).get_attribute("src") or "").strip()
+                        if src.startswith("http://") or src.startswith("https://"):
+                            return src
             except Exception:
                 continue
         return ""
 
-    async def _extract_image(self, page: Page) -> str:
-        try:
-            meta = page.locator("meta[property='og:image']").first
-            if await meta.count():
-                value = (await meta.get_attribute("content") or "").strip()
-                if value.startswith(("http://", "https://")):
-                    return value
-        except Exception:
-            pass
+    async def _extract_description(self, page) -> str:
+        selectors = [
+            "[data-cy='ad_description']",
+            "[data-testid='ad-description-container']",
+            "div[data-testid='description-content']",
+        ]
+        for selector in selectors:
+            try:
+                loc = page.locator(selector).first
+                if not await loc.count():
+                    continue
+                value = clean_text(await loc.inner_text())
+                if value and len(value) >= 8:
+                    return value[:700]
+            except Exception:
+                continue
         return ""
