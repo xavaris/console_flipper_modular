@@ -5,7 +5,7 @@ import logging
 
 from aiogram import Bot
 from playwright.async_api import async_playwright
-from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 from app.config import Settings
 from app.db import Database
@@ -14,7 +14,7 @@ from app.scrapers.allegro_lokalnie import AllegroLokalnieScraper
 from app.scrapers.olx import OLXScraper
 from app.scrapers.vinted import VintedScraper
 from app.services.translator_service import TranslatorService
-from app.utils.filters import is_location_preferred, offer_passes_basic_filters
+from app.utils.filters import offer_passes_basic_filters, is_location_preferred
 from app.utils.formatting import build_offer_caption, build_offer_keyboard
 
 logger = logging.getLogger(__name__)
@@ -30,7 +30,7 @@ class FlipperService:
         self._process_lock = asyncio.Lock()
         self._processing_keys: set[str] = set()
 
-    def _get_scrapers(self) -> list:
+    def _get_scrapers(self):
         scrapers = []
         if self.settings.ENABLE_VINTED:
             scrapers.append(VintedScraper(self.settings))
@@ -65,14 +65,25 @@ class FlipperService:
                 )
 
                 try:
-                    tasks = [asyncio.create_task(self._run_single_scraper(scraper, browser)) for scraper in scrapers]
+                    tasks = [
+                        asyncio.create_task(self._run_single_scraper(scraper, browser))
+                        for scraper in scrapers
+                    ]
                     results = await asyncio.gather(*tasks, return_exceptions=True)
 
                     for scraper, result in zip(scrapers, results):
                         if isinstance(result, Exception):
-                            logger.exception("Scraper %s zakończył się błędem", scraper.source_name, exc_info=result)
+                            logger.exception(
+                                "Scraper %s zakończył się błędem",
+                                scraper.source_name,
+                                exc_info=result,
+                            )
                         else:
-                            logger.info("Scraper %s zakończył pracę | zebrano=%s", scraper.source_name, result)
+                            logger.info(
+                                "Scraper %s zakończył pracę | zebrano=%s",
+                                scraper.source_name,
+                                result,
+                            )
                 finally:
                     await browser.close()
 
@@ -81,7 +92,11 @@ class FlipperService:
     async def _run_single_scraper(self, scraper, browser) -> int:
         logger.info("Start scrapera: %s", scraper.source_name)
         offers = await scraper.scrape(browser, on_offer=self.process_offer)
-        logger.info("Koniec scrapera: %s | ofert łącznie=%s", scraper.source_name, len(offers))
+        logger.info(
+            "Koniec scrapera: %s | ofert łącznie=%s",
+            scraper.source_name,
+            len(offers),
+        )
         return len(offers)
 
     async def process_offer(self, offer: Offer) -> None:
@@ -97,7 +112,12 @@ class FlipperService:
         try:
             logger.info(
                 "RAW | source=%s | model=%s | storage=%s | price=%s | title=%s | url=%s",
-                offer.source, offer.model, offer.storage, offer.price, offer.title, offer.url,
+                offer.source,
+                offer.model,
+                offer.storage,
+                offer.price,
+                offer.title,
+                offer.url,
             )
 
             if not offer_passes_basic_filters(offer, self.settings):
@@ -107,15 +127,21 @@ class FlipperService:
             if self.settings.ENABLE_TRANSLATION and offer.description:
                 offer.description = self.translator.normalize_description_for_post(offer.description)
 
-            baseline_data = await self.db.get_market_baseline(model=offer.model, storage=offer.storage)
+            baseline_data = await self.db.get_market_baseline(
+                model=offer.model,
+                storage=offer.storage,
+            )
 
             if baseline_data:
                 baseline_price, sample_size, scope = baseline_data
                 offer.market_baseline = baseline_price
                 offer.market_sample_size = sample_size
                 offer.market_scope = scope
+
                 if baseline_price > 0 and offer.price > 0:
                     offer.score = round((baseline_price - offer.price) / baseline_price, 4)
+                else:
+                    offer.score = 0.0
             else:
                 offer.score = 0.0
 
@@ -125,7 +151,10 @@ class FlipperService:
             if offer.score < self.settings.MIN_DEAL_SCORE:
                 logger.info(
                     "SCORE OUT | source=%s | score=%s | baseline=%s | title=%s",
-                    offer.source, offer.score, offer.market_baseline, offer.title,
+                    offer.source,
+                    offer.score,
+                    offer.market_baseline,
+                    offer.title,
                 )
                 return
 
@@ -135,7 +164,13 @@ class FlipperService:
 
             logger.info(
                 "FILTERED | source=%s | model=%s | storage=%s | price=%s | score=%s | baseline=%s | title=%s",
-                offer.source, offer.model, offer.storage, offer.price, offer.score, offer.market_baseline, offer.title,
+                offer.source,
+                offer.model,
+                offer.storage,
+                offer.price,
+                offer.score,
+                offer.market_baseline,
+                offer.title,
             )
 
             await self.publish_offer(offer)
@@ -166,15 +201,28 @@ class FlipperService:
             send_kwargs["message_thread_id"] = self.settings.MESSAGE_THREAD_ID
 
         image_url = (offer.image_url or "").strip()
-        has_valid_image = image_url.startswith(("http://", "https://"))
+        has_valid_image = image_url.startswith("http://") or image_url.startswith("https://")
 
         if has_valid_image:
             try:
-                await self.bot.send_photo(photo=image_url, caption=caption, **send_kwargs)
+                await self.bot.send_photo(
+                    photo=image_url,
+                    caption=caption,
+                    **send_kwargs,
+                )
                 logger.info("Wysłano przez send_photo: %s", offer.url)
                 return
             except Exception as e:
-                logger.exception("Błąd send_photo dla %s | image_url=%s | error=%s", offer.url, image_url, e)
+                logger.exception(
+                    "Błąd send_photo dla %s | image_url=%s | error=%s",
+                    offer.url,
+                    image_url,
+                    e,
+                )
 
-        await self.bot.send_message(text=caption, disable_web_page_preview=False, **send_kwargs)
+        await self.bot.send_message(
+            text=caption,
+            disable_web_page_preview=False,
+            **send_kwargs,
+        )
         logger.info("Wysłano przez send_message: %s", offer.url)
