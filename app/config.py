@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     CHANNEL_ID: str
     MESSAGE_THREAD_ID: int | None = 719
 
-    SCAN_INTERVAL_MINUTES: int = 5
+    SCAN_INTERVAL_MINUTES: int = 1
     STARTUP_SCAN: bool = True
 
     DATABASE_PATH: str = "/app/data/offers.db"
@@ -28,32 +28,37 @@ class Settings(BaseSettings):
 
     HEADLESS: bool = True
     PLAYWRIGHT_TIMEOUT_MS: int = 30000
-    MAX_OFFERS_PER_SOURCE: int = 18
-    REQUEST_DELAY_MS: int = 900
-    RANDOM_DELAY_MIN_MS: int = 500
-    RANDOM_DELAY_MAX_MS: int = 1800
+    MAX_OFFERS_PER_SOURCE: int = 10
+    REQUEST_DELAY_MS: int = 700
     USER_AGENT: str = (
         "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
         "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
     )
 
     ONLY_MODELS: str = ""
-
     EXCLUDED_KEYWORDS: str = (
-        "konto,pudełko,samo pudełko,pudelko,etui,case,pokrowiec,gra,gry,pad,pady,controller,"
-        "kontroler,kontrolery,joy-con,joy con,dock,stacja dokująca,stacja dokujaca,ładowarka,"
-        "ladowarka,zasilacz,kabel,obudowa,na części,na czesci,uszkodzona,uszkodzony,kierownica,"
-        "pedały,pedaly,thrustmaster,logitech g29,logitech g920,monitor,tv,telewizor,portal,playstation portal"
+        "pad,kontroler,controller,gamepad,joycon,joy-con,dualshock,dualsense,"
+        "kierownica,pedały,pedaly,thrustmaster,logitech g29,g920,g923,fanatec,"
+        "gra,gry,game,games,cd,key,klucz,konto,"
+        "etui,case,pokrowiec,obudowa,stojak,stand,dock,stacja dokująca,stacja dokujaca,"
+        "ładowarka,ladowarka,kabel,zasilacz,uchwyt,adapter,"
+        "pudełko,pudelko,karton,box,samo pudełko,samo pudelko,"
+        "na części,na czesci,części,czesci,uszkodzony,uszkodzona,"
+        "tv,telewizor,monitor,projektor,"
+        "ps1,ps2,ps3,ps4,playstation 1,playstation 2,playstation 3,playstation 4,"
+        "xbox one,xbox 360,switch lite"
     )
+
     PREFERRED_LOCATIONS: str = ""
     PREFERRED_REGIONS: str = ""
 
-    MIN_DEAL_SCORE: float = 0.03
+    MIN_DEAL_SCORE: float = 0.00
     MIN_PRICE: float = 300
-    MAX_PRICE: float = 5000
+    MAX_PRICE: float = 10000
     MAX_PRICE_BY_MODEL_JSON: str = (
-        '{"xbox series s": 1800, "xbox series x": 2600, "nintendo switch": 1700, '
-        '"nintendo switch 2": 3200, "playstation 5": 3000, "playstation portal": 1400, '
+        '{"xbox series s": 1800, "xbox series x": 2800, '
+        '"playstation 5": 3200, "playstation portal": 1400, '
+        '"nintendo switch": 1600, "nintendo switch 2": 3500, '
         '"steam deck": 3200}'
     )
 
@@ -65,12 +70,10 @@ class Settings(BaseSettings):
     TRANSLATE_TO_LANGUAGE: str = "pl"
 
     ENABLE_MARKET_BASELINE_REFRESH: bool = True
-    BASELINE_REFRESH_INTERVAL_HOURS: int = 12
+    BASELINE_REFRESH_INTERVAL_HOURS: int = 24
     BASELINE_MAX_OFFERS_PER_QUERY: int = 60
     BASELINE_MIN_SAMPLES_FOR_STORAGE: int = 4
     BASELINE_MIN_SAMPLES_FOR_MODEL: int = 6
-
-    CONCURRENT_DETAIL_PAGES: int = 4
 
     @field_validator("SCAN_INTERVAL_MINUTES")
     @classmethod
