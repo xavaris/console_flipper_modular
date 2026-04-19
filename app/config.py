@@ -29,7 +29,11 @@ class Settings(BaseSettings):
     HEADLESS: bool = True
     PLAYWRIGHT_TIMEOUT_MS: int = 30000
     MAX_OFFERS_PER_SOURCE: int = 10
+
     REQUEST_DELAY_MS: int = 700
+    RANDOM_DELAY_MIN_MS: int = 500
+    RANDOM_DELAY_MAX_MS: int = 1600
+
     USER_AGENT: str = (
         "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
         "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
@@ -80,6 +84,20 @@ class Settings(BaseSettings):
     def validate_scan_interval(cls, value: int) -> int:
         if value < 1:
             raise ValueError("SCAN_INTERVAL_MINUTES musi być >= 1")
+        return value
+
+    @field_validator("RANDOM_DELAY_MAX_MS")
+    @classmethod
+    def validate_random_delay_max(cls, value: int) -> int:
+        if value < 0:
+            raise ValueError("RANDOM_DELAY_MAX_MS musi być >= 0")
+        return value
+
+    @field_validator("RANDOM_DELAY_MIN_MS")
+    @classmethod
+    def validate_random_delay_min(cls, value: int) -> int:
+        if value < 0:
+            raise ValueError("RANDOM_DELAY_MIN_MS musi być >= 0")
         return value
 
     @property
