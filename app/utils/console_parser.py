@@ -5,41 +5,26 @@ import re
 from app.constants import (
     COLOR_KEYWORDS,
     CONDITION_KEYWORDS,
-    CONSOLE_MODELS,
     MODEL_ALIASES,
-    NEGATIVE_MODEL_ALIASES,
     STORAGE_PATTERNS,
 )
 from app.utils.misc import clean_text
 
 
-def parse_model(text: str) -> str:
+def parse_console_model(text: str) -> str:
     value = clean_text(text).lower()
-    value = value.replace("sony ", "").replace("microsoft ", "")
 
-    for model in CONSOLE_MODELS:
-        negatives = NEGATIVE_MODEL_ALIASES.get(model, [])
-        if any(alias in value for alias in negatives):
-            continue
-
-        aliases = MODEL_ALIASES.get(model, [])
-        if any(alias in value for alias in aliases):
-            return model
-
-    if re.search(r"\bps5\b", value) and not re.search(r"portal|ps4|ps3|ps2|ps1", value):
-        return "playstation 5"
-
-    if re.search(r"\bxsx\b", value) and "xbox one" not in value:
-        return "xbox series x"
-
-    if re.search(r"\bxss\b", value) and "xbox one" not in value:
-        return "xbox series s"
+    for canonical_model, aliases in MODEL_ALIASES.items():
+        for alias in sorted(aliases, key=len, reverse=True):
+            if alias in value:
+                return canonical_model
 
     return ""
 
 
-def parse_storage(text: str) -> str:
+def parse_console_storage(text: str) -> str:
     value = clean_text(text).lower().replace(" ", "")
+
     for item in STORAGE_PATTERNS:
         if item in value:
             return item.upper()
@@ -55,7 +40,7 @@ def parse_storage(text: str) -> str:
     return ""
 
 
-def parse_color(text: str) -> str:
+def parse_console_color(text: str) -> str:
     value = clean_text(text).lower()
     for color in sorted(COLOR_KEYWORDS, key=len, reverse=True):
         if color in value:
@@ -63,7 +48,7 @@ def parse_color(text: str) -> str:
     return ""
 
 
-def parse_condition(text: str) -> str:
+def parse_console_condition(text: str) -> str:
     value = clean_text(text).lower()
     for label, keywords in CONDITION_KEYWORDS.items():
         for keyword in keywords:
