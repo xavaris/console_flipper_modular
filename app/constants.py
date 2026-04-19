@@ -10,20 +10,96 @@ CONSOLE_MODELS = [
     "steam deck",
 ]
 
+MODEL_ALIASES = {
+    "playstation portal": [
+        "playstation portal",
+        "ps portal",
+        "portal ps5",
+        "playstation portal remote player",
+    ],
+    "playstation 5": [
+        "playstation 5",
+        "ps5",
+        "ps 5",
+        "sony playstation 5",
+    ],
+    "xbox series x": [
+        "xbox series x",
+    ],
+    "xbox series s": [
+        "xbox series s",
+    ],
+    "nintendo switch 2": [
+        "nintendo switch 2",
+        "switch 2",
+    ],
+    "nintendo switch": [
+        "nintendo switch",
+        "switch oled",
+        "nintendo switch oled",
+        "switch v2",
+        "switch hac-001",
+    ],
+    "steam deck": [
+        "steam deck",
+        "steamdeck",
+    ],
+}
+
 STORAGE_PATTERNS = [
-    "32gb", "64gb", "128gb", "256gb", "512gb", "1tb",
+    "32gb",
+    "64gb",
+    "128gb",
+    "256gb",
+    "512gb",
+    "1tb",
 ]
 
 COLOR_KEYWORDS = [
-    "black", "white", "blue", "red", "gray", "grey",
-    "czarny", "biały", "bialy", "niebieski", "czerwony", "szary", "grafitowy",
+    "black",
+    "white",
+    "blue",
+    "red",
+    "gray",
+    "grey",
+    "silver",
+    "czarny",
+    "biały",
+    "bialy",
+    "niebieski",
+    "czerwony",
+    "szary",
+    "srebrny",
+    "grafitowy",
 ]
 
 CONDITION_KEYWORDS = {
-    "jak nowy": ["jak nowy", "idealny", "stan idealny", "perfekcyjny", "nowy"],
-    "bardzo dobry": ["bardzo dobry", "super stan", "ładny stan", "ladny stan"],
-    "dobry": ["dobry", "sprawny", "używany", "uzywany"],
-    "uszkodzony": ["uszkodzony", "na części", "na czesci", "nie działa", "nie dziala"],
+    "jak nowy": [
+        "jak nowy",
+        "idealny",
+        "stan idealny",
+        "perfekcyjny",
+        "nowy",
+    ],
+    "bardzo dobry": [
+        "bardzo dobry",
+        "super stan",
+        "ładny stan",
+        "ladny stan",
+    ],
+    "dobry": [
+        "dobry",
+        "sprawny",
+        "używany",
+        "uzywany",
+    ],
+    "uszkodzony": [
+        "uszkodzony",
+        "na części",
+        "na czesci",
+        "nie działa",
+        "nie dziala",
+    ],
 }
 
 PLATFORM_NAMES = {
