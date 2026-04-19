@@ -55,3 +55,20 @@ def parse_console_condition(text: str) -> str:
             if keyword in value:
                 return label
     return ""
+
+
+# Backward-compatible aliases for old imports across the project.
+def parse_model(text: str) -> str:
+    return parse_console_model(text)
+
+
+def parse_storage(text: str) -> str:
+    return parse_console_storage(text)
+
+
+def parse_color(text: str) -> str:
+    return parse_console_color(text)
+
+
+def parse_condition(text: str) -> str:
+    return parse_console_condition(text)
